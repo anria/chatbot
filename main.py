@@ -27,7 +27,7 @@ from openai import OpenAI
 # ---------------------------------------------------------------------------
 
 HOST           = os.getenv("HOST")
-PORT           = int(os.getenv("PORT"))
+PORT           = int(os.getenv("PORT", 8765))
 DEEPSEEK_URL   = os.getenv("DEEPSEEK_HOST")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL")
 BEARER_TOKEN   = os.getenv("BEARER_TOKEN")
