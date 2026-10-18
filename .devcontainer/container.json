@@ -1,0 +1,16 @@
+{
+  "name": "Python uv Development",
+  "image": "://microsoft.com",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${WorkspaceFolder}/.venv/bin/python"
+      }
+    }
+  },
+  "postCreateCommand": "pip install uv && uv sync"
+}
