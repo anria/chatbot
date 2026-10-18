@@ -25,9 +25,17 @@ from openai import OpenAI
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+try: 
+    # This is local - on codespaces it takes env from the Secrets in the Settings
+    load_dotenv()
+except:
+    pass
+
+PORT = os.getenv("PORT")
+if isinstance(PORT, str):
+    PORT = int(PORT)
 
 HOST           = os.getenv("HOST")
-PORT           = int(os.getenv("PORT", 8765))
 DEEPSEEK_URL   = os.getenv("DEEPSEEK_HOST")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL")
 BEARER_TOKEN   = os.getenv("BEARER_TOKEN")
@@ -126,7 +134,7 @@ def stream_reply(messages):
         chunk = completion.choices[0].message.content
         if chunk:
             yield chunk
-        if obj.get("done"):
+        # if obj.get("done"):
             return
     except Exception as e:
         yield f"\n[Chatbot error: {e}]"
