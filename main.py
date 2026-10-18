@@ -4,11 +4,13 @@ chatbot — standalone chatbot with Ollama, feedback, and judgements.
 
 Run with:  uv run main.py
 Serves on: http://127.0.0.1:8765
+uv add python-dotenv
+uv add openai
 """
 
 import json
 import os
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 
 import threading
 import urllib.request
@@ -18,16 +20,24 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
+from openai import OpenAI
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-# OLLAMA_HOST    = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-OLLAMA_HOST    = os.environ.get("OLLAMA_HOST", "https://anria-ai-bots--ollama-gateway-api.us-east.modal.run").rstrip("/")
 
-OLLAMA_MODEL   = os.environ.get("OLLAMA_MODEL", "granite3.1-moe:1b").rstrip("/") 
-OLLAMA_TIMEOUT = os.environ.get("OLLAMA_TIMEOUT", 1600)
-HOST           = os.environ.get("HOST", "127.0.0.1").rstrip("/")
-PORT           = os.environ.get("PORT", 8765)
+HOST           = os.getenv("HOST")
+PORT           = int(os.getenv("PORT"))
+DEEPSEEK_URL   = os.getenv("DEEPSEEK_HOST")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL")
+BEARER_TOKEN   = os.getenv("BEARER_TOKEN")
+
+# use Modal.com's deepseek
+client = OpenAI(
+    base_url=DEEPSEEK_URL,
+    api_key=BEARER_TOKEN,
+)
+print("DEEPSEEK_URL", DEEPSEEK_URL, "BEARER_TOKEN",BEARER_TOKEN, flush=True)
 
 BASE_DIR  = Path(__file__).resolve().parent
 DATA_FILE = BASE_DIR / "data" / "assistant_responses.json"
@@ -99,7 +109,30 @@ def feedback_notes(idx: int, notes: str) -> dict | None:
 # ---------------------------------------------------------------------------
 # Ollama streaming generator
 # ---------------------------------------------------------------------------
+
 def stream_reply(messages):
+    messages = messages[-MAX_HISTORY:]
+    all_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+    try:
+        completion = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=all_messages,
+            temperature=0.3,
+            max_tokens=4096,
+            top_p=0.9,
+            stream=False,
+            extra_body={"reasoning_effort": "high"},
+        )
+        chunk = completion.choices[0].message.content
+        if chunk:
+            yield chunk
+        if obj.get("done"):
+            return
+    except Exception as e:
+        yield f"\n[Chatbot error: {e}]"
+
+
+def stream_reply_requests(messages):
     messages = messages[-MAX_HISTORY:]
     ollama_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
     payload = {
@@ -869,7 +902,7 @@ def main():
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"[chatbot] Serving on http://{HOST}:{PORT}")
     print(f"[chatbot] Data file: {DATA_FILE}")
-    print(f"[chatbot] Ollama:    {OLLAMA_HOST} (model: {OLLAMA_MODEL})")
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
