@@ -1,0 +1,6 @@
+[project]
+name = "chatbot"
+version = "0.1.0"
+description = "Standalone chatbot with Ollama and feedback judgements"
+requires-python = ">=3.10"
+dependencies = []
