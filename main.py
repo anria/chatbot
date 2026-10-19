@@ -56,7 +56,16 @@ if not DATA_FILE.exists():
 _lock = threading.Lock()
 
 SYSTEM_PROMPT = (
-    "You are a friendly assistant for the AI Search site. Answer concisely and helpfully. If you don't know, say so. Do not answer anything illegal or which has questionable morals. Answer in a single short paragraph each time."
+    """ 
+        You are a friendly assistant for the AI Search site. 
+        - Answer concisely and helpfully. 
+        - If you don't know, say so. 
+        - Do not answer anything illegal or which has questionable morals. 
+        - Answer in a single short paragraph each time. 
+        - If you are asked about a specific court case, return with judge, parties, court, year, issue, ruling, dissent. Put each item on a new line.
+        - if asked for a list, return a numbered list.
+        - do not use asterisks.
+    """
 )
 MAX_HISTORY = 4
 
@@ -122,6 +131,36 @@ def stream_reply(messages):
     messages = messages[-MAX_HISTORY:]
     all_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
     try:
+        # Request a streaming response
+        stream = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=all_messages,
+            temperature=0.3,
+            max_tokens=4096,
+            top_p=0.9,
+            stream=True,
+            extra_body={"thinking": {"type": "disabled"}},
+        )
+        retVal = ""
+        # Iterate over chunks as they arrive
+        for chunk in stream:
+            # Guard: some chunks (e.g. the final usage chunk) may have empty choices
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            # Only yield when there's actual text content
+            if delta.content:
+                yield delta.content
+
+    except Exception as e:
+        # Surface a readable error into the chat stream
+        yield f"\n[Chatbot error: {e}]"
+
+
+def stream_reply_once(messages):
+    messages = messages[-MAX_HISTORY:]
+    all_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+    try:
         completion = client.chat.completions.create(
             model=DEEPSEEK_MODEL,
             messages=all_messages,
@@ -134,13 +173,12 @@ def stream_reply(messages):
         chunk = completion.choices[0].message.content
         if chunk:
             yield chunk
-        # if obj.get("done"):
-            return
+    
     except Exception as e:
         yield f"\n[Chatbot error: {e}]"
 
 
-def stream_reply_requests(messages):
+def stream_reply_ollama(messages):
     messages = messages[-MAX_HISTORY:]
     ollama_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
     payload = {
