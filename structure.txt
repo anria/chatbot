@@ -1,5 +1,8 @@
 chatbot/
 ├── main.py
+├── search.py
 ├── pyproject.toml
+├── run.sh
 └── data/
+    ├── cases.pkl
     └── assistant_responses.json

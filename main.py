@@ -6,6 +6,10 @@ Run with:  uv run main.py
 Serves on: http://127.0.0.1:8765
 uv add python-dotenv
 uv add openai
+uv add numpy
+uv add pandas
+uv add rank_bm25
+uv add sentence-transformers
 """
 
 import json
@@ -21,6 +25,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 from openai import OpenAI
+import subprocess, sys
 
 # ---------------------------------------------------------------------------
 # Config
@@ -32,10 +37,15 @@ except:
     pass
 
 PORT = os.getenv("PORT")
+SEARCH_PORT = os.getenv("SEARCH_PORT")
+
 if isinstance(PORT, str):
     PORT = int(PORT)
+#if isinstance(SEARCH_PORT, str):
+#    SEARCH_PORT = int(SEARCH_PORT)
 
 HOST           = os.getenv("HOST")
+SEARCH_URL     = "http://" + HOST + ":" + SEARCH_PORT
 DEEPSEEK_URL   = os.getenv("DEEPSEEK_HOST")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL")
 BEARER_TOKEN   = os.getenv("BEARER_TOKEN")
@@ -45,6 +55,7 @@ client = OpenAI(
     base_url=DEEPSEEK_URL,
     api_key=BEARER_TOKEN,
 )
+
 print("DEEPSEEK_URL", DEEPSEEK_URL, "BEARER_TOKEN",BEARER_TOKEN, flush=True)
 
 BASE_DIR  = Path(__file__).resolve().parent
@@ -347,6 +358,7 @@ main { max-width: 900px; margin: 0 auto; padding: 24px; display: flex;
         <span class="banner-title">AI Search Assistant</span>
     </div>
     <div class="banner-right">
+        <a href="__SEARCH_URL__" target="_blank" class="banner-link">Search</a>
         <a href="/judgements" class="banner-link" target="blank">View judgements</a>
     </div>
 </header>
@@ -813,7 +825,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self._path()
         if path == "/":
-            self._send_html(CHAT_HTML.replace("__BASE_CSS__", BASE_CSS))
+            self._send_html(CHAT_HTML.replace("__BASE_CSS__", BASE_CSS).replace("__SEARCH_URL__", SEARCH_URL))
         elif path == "/judgements":
             self._send_html(JUDGEMENTS_HTML.replace("__BASE_CSS__", BASE_CSS))
         elif path == "/api/judgements":
@@ -945,15 +957,27 @@ class Handler(BaseHTTPRequestHandler):
 # Entrypoint
 # ---------------------------------------------------------------------------
 def main():
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    # server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"[chatbot] Serving on http://{HOST}:{PORT}")
     print(f"[chatbot] Data file: {DATA_FILE}")
+    print(f"[chatbot] Search  on {SEARCH_URL}")
 
     try:
+        # server.serve_forever()
+
+        # Optionally launch search.py as a child process
+        search_proc = subprocess.Popen(
+            [sys.executable, str(BASE_DIR / "search.py")],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        server = ThreadingHTTPServer((HOST, PORT), Handler)
         server.serve_forever()
     except KeyboardInterrupt:
         print("\n[chatbot] Shutting down…")
         server.shutdown()
+
+    finally:
+        search_proc.terminate()
 
 
 if __name__ == "__main__":
